@@ -29,6 +29,8 @@ const (
 	errHashPassword      = "failed to hash password"
 )
 
+const errUserNotFound = "user not found"
+
 type AuthService struct {
 	userRepo          *repository.UserRepository
 	tokenRepo         *repository.TokenRepository
@@ -66,6 +68,40 @@ func NewAuthService(
 		mfaService:        mfaService,
 		config:            cfg,
 	}
+}
+func (s *AuthService) getRefreshTokenExpiry() time.Duration {
+	expiry, err := time.ParseDuration(s.config.JWT.RefreshExpiry)
+
+	if err != nil {
+		log.Printf("Warning: invalid RefreshExpiry value %q, using default 7 days", s.config.JWT.RefreshExpiry)
+		return 7 * 24 * time.Hour
+	}
+
+	return expiry
+}
+
+func (s *AuthService) createRefreshToken(userID, token, ipAddress, userAgent string) error {
+	refreshToken := &models.RefreshToken{
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(s.getRefreshTokenExpiry()),
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	}
+
+	return s.tokenRepo.CreateRefreshToken(refreshToken)
+}
+func (s *AuthService) hashPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
+
+	if err != nil {
+		return "", errors.New("failed to hash password")
+	}
+
+	return string(hashedPassword), nil
 }
 
 // ... Register and other methods remain same ...
@@ -122,7 +158,7 @@ func (s *AuthService) ResetPassword(tokenString, newPassword string) error {
 	}
 
 	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	hashedPassword, err := s.hashPassword(newPassword)
 	if err != nil {
 		return errors.New(errHashPassword)
 	}
@@ -201,7 +237,7 @@ func (s *AuthService) ChangePassword(userID string, req *dto.ChangePasswordReque
 	}
 
 	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	hashedPassword, err := s.hashPassword(req.NewPassword)
 	if err != nil {
 		return errors.New(errHashPassword)
 	}
@@ -342,7 +378,7 @@ func (s *AuthService) Register(req *dto.RegisterRequest) (*models.User, error) {
 	}
 
 	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hashedPassword, err := s.hashPassword(req.Password)
 	if err != nil {
 		return nil, errors.New(errHashPassword)
 	}
@@ -505,11 +541,14 @@ func (s *AuthService) LoginWithOAuth(email, oauthID, firstName, lastName, provid
 	if err != nil {
 		// User does not exist, create new one
 		password := s.tokenService.GenerateRandomString(32)
-		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
+		hashedPassword, err := s.hashPassword(password)
+		if err != nil {
+			return nil, err
+		}
 		user = &models.User{
 			Email:         email,
-			PasswordHash:  string(hashedPassword),
+			PasswordHash:  hashedPassword,
 			FirstName:     firstName,
 			LastName:      lastName,
 			OAuthProvider: provider,
@@ -607,7 +646,7 @@ func (s *AuthService) RefreshAccessToken(refreshTokenString string, ipAddress, u
 	// Get user
 	user, err := s.userRepo.FindByID(claims.UserID)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, errors.New(errUserNotFound)
 	}
 
 	// Token rotation: Generate new refresh token
