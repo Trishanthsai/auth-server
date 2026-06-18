@@ -380,8 +380,18 @@ func buildUserInfoResponse(user *models.User, accessToken *models.OAuthAccessTok
 	return response
 }
 
+func isSafeRedirectURI(u *url.URL) bool {
+	scheme := strings.ToLower(u.Scheme)
+	// Use an allowlist for secure redirect URI schemes
+	return scheme == "http" || scheme == "https"
+}
+
 func redirectWithCode(c *gin.Context, redirectURI, code, state string) {
-	u, _ := url.Parse(redirectURI)
+	u, err := url.Parse(redirectURI)
+	if err != nil || !isSafeRedirectURI(u) {
+		c.HTML(http.StatusBadRequest, errTmpl, gin.H{"error": "Invalid or unsafe redirect_uri format"})
+		return
+	}
 	q := u.Query()
 	q.Set("code", code)
 	if state != "" {
@@ -392,7 +402,11 @@ func redirectWithCode(c *gin.Context, redirectURI, code, state string) {
 }
 
 func redirectError(c *gin.Context, redirectURI, errorCode, errorDesc, state string) {
-	u, _ := url.Parse(redirectURI)
+	u, err := url.Parse(redirectURI)
+	if err != nil || !isSafeRedirectURI(u) {
+		c.HTML(http.StatusBadRequest, errTmpl, gin.H{"error": "Invalid or unsafe redirect_uri format"})
+		return
+	}
 	q := u.Query()
 	q.Set("error", errorCode)
 	q.Set("error_description", errorDesc)
