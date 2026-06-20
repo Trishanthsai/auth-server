@@ -105,7 +105,7 @@ func main() {
 
 	go func() {
 
-		log.Printf("📊 Prometheus metrics exposed on http://localhost%s/metrics", metricsAddr)
+		log.Printf("📊 Prometheus metrics exposed on http://%s/metrics", metricsAddr)
 
 		if err := metricsServer.ListenAndServe(); err != nil &&
 			err != http.ErrServerClosed {
