@@ -100,12 +100,13 @@ func main() {
 		Handler:           promhttp.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
 
-		log.Printf("📊 Prometheus metrics exposed on http://localhost%s/metrics", metricsAddr)
+		log.Printf("📊 Prometheus metrics exposed on http://%s/metrics", metricsAddr)
 
 		if err := metricsServer.ListenAndServe(); err != nil &&
 			err != http.ErrServerClosed {

@@ -16,22 +16,28 @@ import (
 func TestPrometheusMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	const (
+		method = http.MethodGet
+		path   = "/test-prometheus-middleware"
+		status = "200"
+	)
+
 	before := testutil.ToFloat64(
 		metrics.HTTPRequestsTotal.WithLabelValues(
-			http.MethodGet,
-			"/test",
-			"200",
+			method,
+			path,
+			status,
 		),
 	)
 
 	router := gin.New()
 	router.Use(middleware.PrometheusMiddleware())
 
-	router.GET("/test", func(c *gin.Context) {
+	router.GET(path, func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "ok"})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req := httptest.NewRequest(method, path, nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -40,9 +46,9 @@ func TestPrometheusMiddleware(t *testing.T) {
 
 	after := testutil.ToFloat64(
 		metrics.HTTPRequestsTotal.WithLabelValues(
-			http.MethodGet,
-			"/test",
-			"200",
+			method,
+			path,
+			status,
 		),
 	)
 
@@ -52,18 +58,24 @@ func TestPrometheusMiddleware(t *testing.T) {
 func TestPrometheusMiddleware_UnmatchedRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
+	const (
+		method = http.MethodGet
+		path   = "unmatched_route"
+		status = "404"
+	)
+
 	before := testutil.ToFloat64(
 		metrics.HTTPRequestsTotal.WithLabelValues(
-			http.MethodGet,
-			"unmatched_route",
-			"404",
+			method,
+			path,
+			status,
 		),
 	)
 
 	router := gin.New()
 	router.Use(middleware.PrometheusMiddleware())
 
-	req := httptest.NewRequest(http.MethodGet, "/does-not-exist", nil)
+	req := httptest.NewRequest(http.MethodGet, "/does-not-exist-prometheus-test", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -72,9 +84,9 @@ func TestPrometheusMiddleware_UnmatchedRoute(t *testing.T) {
 
 	after := testutil.ToFloat64(
 		metrics.HTTPRequestsTotal.WithLabelValues(
-			http.MethodGet,
-			"unmatched_route",
-			"404",
+			method,
+			path,
+			status,
 		),
 	)
 

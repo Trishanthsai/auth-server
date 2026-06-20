@@ -55,3 +55,13 @@ func TestRegister(t *testing.T) {
 		assert.True(t, found, "metric %s should be registered", name)
 	}
 }
+
+func TestHTTPMetrics(t *testing.T) {
+    metrics.HTTPRequestsTotal.
+        WithLabelValues("GET", "/test", "200").
+        Inc()
+
+    metrics.HTTPRequestDuration.
+        WithLabelValues("GET", "/test").
+        Observe(0.1)
+}

@@ -3,12 +3,16 @@ package metrics
 import (
 	"log"
 	"math"
+	"sync"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 type SessionCounter interface {
-    CountActiveSessions() (int64, error)
+	CountActiveSessions() (int64, error)
 }
+
+var registerOnce sync.Once
 
 var (
 	LoginSuccessTotal = prometheus.NewCounter(
@@ -22,6 +26,7 @@ var (
 			Name: "auth_login_failure_total",
 			Help: "Total number of failed user login attempts",
 		})
+
 	HTTPRequestsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "auth_http_requests_total",
@@ -29,6 +34,7 @@ var (
 		},
 		[]string{"method", "endpoint", "status"},
 	)
+
 	HTTPRequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
@@ -40,26 +46,28 @@ var (
 )
 
 func Register(counter SessionCounter) {
-	activeSessions := prometheus.NewGaugeFunc(
-		prometheus.GaugeOpts{
-			Name: "auth_active_sessions",
-			Help: "Current number of active user sessions",
-		},
-		func() float64 {
-			count, err := counter.CountActiveSessions()
-			if err != nil {
-				log.Printf("metrics: failed to count active sessions: %v", err)
-				return math.NaN()
-			}
-			return float64(count)
-		},
-	)
+	registerOnce.Do(func() {
+		activeSessions := prometheus.NewGaugeFunc(
+			prometheus.GaugeOpts{
+				Name: "auth_active_sessions",
+				Help: "Current number of active user sessions",
+			},
+			func() float64 {
+				count, err := counter.CountActiveSessions()
+				if err != nil {
+					log.Printf("metrics: failed to count active sessions: %v", err)
+					return math.NaN()
+				}
+				return float64(count)
+			},
+		)
 
-	prometheus.MustRegister(
-		LoginSuccessTotal,
-		LoginFailureTotal,
-		activeSessions,
-		HTTPRequestsTotal,
-		HTTPRequestDuration,
-	)
+		prometheus.MustRegister(
+			LoginSuccessTotal,
+			LoginFailureTotal,
+			activeSessions,
+			HTTPRequestsTotal,
+			HTTPRequestDuration,
+		)
+	})
 }
