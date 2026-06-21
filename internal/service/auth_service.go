@@ -900,6 +900,15 @@ func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
 	return user, nil
 }
 
+// GetUsers get all users by limit and offset [Pagination]
+func (s *AuthService) GetUsers(limit, offset int) (models.PaginatedUsers, error) {
+	users, err := s.userRepo.GetUsers(limit, offset)
+	if err != nil {
+		return models.PaginatedUsers{}, err
+	}
+	return users, nil
+}
+
 // GetUserSessions retrieves all active sessions for a user
 func (s *AuthService) GetUserSessions(userID string) ([]models.RefreshToken, error) {
 	tokens, err := s.tokenRepo.FindUserRefreshTokens(userID)
