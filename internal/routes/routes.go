@@ -42,6 +42,7 @@ func SetupRoutes(router *gin.Engine, db *gorm.DB, redisClient *redis.Client, cfg
 	auditService := service.NewAuditService(auditRepo)
 	oauthService := service.NewOAuthService(cfg, oauthProviderConfigRepo)
 	mfaService := service.NewMFAService(cfg)
+	backupCodeRepo := repository.NewBackupCodeRepository(db)
 
 	authService := service.NewAuthService(
 		userRepo,
@@ -54,7 +55,7 @@ func SetupRoutes(router *gin.Engine, db *gorm.DB, redisClient *redis.Client, cfg
 		auditService,
 		mfaService,
 		cfg,
-		backupCodeRepo    *repository.BackupCodeRepository
+		backupCodeRepo,
 	)
 
 	// OAuth Provider service

@@ -976,7 +976,11 @@ func (h *AuthHandler) LoginMFA(c *gin.Context) {
 	ipAddress := c.ClientIP()
 	userAgent := c.GetHeader("User-Agent")
 
-	resp, err := h.authService.VerifyLoginMFA(req.MFAToken, req.Code, ipAddress, userAgent)
+	resp, err := h.authService.VerifyLoginMFA(req.MFAToken,
+    req.Code,
+    req.BackupCode,
+    ipAddress,
+    userAgent,)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, utils.ErrorResponse("MFA login failed", err))
 		return

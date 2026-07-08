@@ -104,9 +104,11 @@ type MFADisableRequest struct {
 // the short-lived token returned by the password step (proving the password
 // was verified); the email is no longer accepted here to prevent bypassing
 // the password step.
+// MFALoginRequest represents the request to login with MFA.
+// Either Code (TOTP) or BackupCode must be provided.
 type MFALoginRequest struct {
-	MFAToken string `json:"mfaToken" binding:"required"`
-	Code     string `json:"code" binding:"required,len=6"`
+	MFAToken   string `json:"mfaToken" binding:"required"`
+	Code       string `json:"code,omitempty"`
 	BackupCode string `json:"backupCode,omitempty"`
 }
 

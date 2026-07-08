@@ -423,7 +423,7 @@ func (s *AuthService) DisableMFA(userID, password, code string) error {
 // short-lived MFA-pending token issued by the password step (Login), so the
 // password cannot be bypassed, and rate-limits code attempts to prevent
 // brute-forcing the 6-digit TOTP.
-func (s *AuthService) VerifyLoginMFA(mfaToken, code, ipAddress, userAgent string) (*dto.LoginResponse, error) {
+func (s *AuthService) VerifyLoginMFA(mfaToken,code,backupCode, ipAddress, userAgent string) (*dto.LoginResponse, error) {
 	ctx := context.Background()
 
 	userID, err := s.tokenService.ValidateMFAToken(mfaToken)
@@ -449,20 +449,27 @@ func (s *AuthService) VerifyLoginMFA(mfaToken, code, ipAddress, userAgent string
 		return nil, errors.New("MFA not enabled for this user")
 	}
 
-	valid := s.mfaService.ValidateMFA(user.MFASecret, code)
+	valid := false
 
-if !valid {
+// Prefer TOTP when provided.
+if code != "" {
+	valid = s.mfaService.ValidateMFA(user.MFASecret, code)
+}
+
+// If TOTP wasn't provided or failed, try a backup code.
+if !valid && backupCode != "" {
 	codes, err := s.backupCodeRepo.FindByUserID(userID)
-
 	if err == nil {
 		for _, bc := range codes {
 			if bcrypt.CompareHashAndPassword(
 				[]byte(bc.CodeHash),
-				[]byte(code),
+				[]byte(backupCode),
 			) == nil {
 
-				valid = true
-				_ = s.backupCodeRepo.MarkUsed(bc.ID)
+				// Only succeed if the backup code was successfully consumed.
+				if err := s.backupCodeRepo.MarkUsed(bc.ID); err == nil {
+					valid = true
+				}
 				break
 			}
 		}
