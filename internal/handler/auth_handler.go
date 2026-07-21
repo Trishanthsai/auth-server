@@ -900,13 +900,16 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.VerifyEnableMFA(userID.(string), req.Code); err != nil {
-		c.JSON(http.StatusBadRequest, utils.ErrorResponse("MFA verification failed", err))
-		return
-	}
-	
+	backupCodes, err := h.authService.VerifyEnableMFA(userID.(string), req.Code)
+if err != nil {
+    c.JSON(http.StatusBadRequest, utils.ErrorResponse("MFA verification failed", err))
+    return
+}
 
-	c.JSON(http.StatusOK, utils.SuccessResponse("MFA enabled successfully", nil))
+c.JSON(
+    http.StatusOK,
+    utils.SuccessResponse("MFA enabled successfully", backupCodes),
+)
 }
 
 // DisableMFA re-authenticates the user via password and TOTP code, then disables MFA
@@ -922,7 +925,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 // @Failure 404 {object} utils.Response
 // @Failure 500 {object} utils.Response
 // @Router /api/auth/mfa/disable [post]
-func (h *AuthHandler) DisableMFA(c *gin.Context) {
+func (h *AuthHandler) DisableMFA(c *gin.Context){
 	userIDVal, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, utils.UnauthorizedResponse("Unauthorized"))

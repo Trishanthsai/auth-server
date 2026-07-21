@@ -332,54 +332,57 @@ func (s *AuthService) EnableMFA(userID string) (*dto.MFAEnableResponse, error) {
 }
 
 // VerifyEnableMFA verifies the code and enables MFA
-func (s *AuthService) VerifyEnableMFA(userID, code string) error {
+func (s *AuthService) VerifyEnableMFA(userID, code string) ([]string, error){
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
-		return ErrUserNotFound
+		return nil, ErrUserNotFound
 	}
 
 	if user.MFAEnabled {
-		return errors.New("MFA is already enabled")
+		return nil, errors.New("MFA is already enabled")
 	}
 
 	if user.MFASecret == "" {
-		return errors.New("MFA setup not initiated")
+		return nil, errors.New("MFA setup not initiated")
 	}
 
 	if !s.mfaService.ValidateMFA(user.MFASecret, code) {
-		return ErrInvalidMFACode
+		return nil, ErrInvalidMFACode
 	}
+	backupCodes := make([]string, 0, 10)
 	for i := 0; i < 10; i++ {
-	code := s.tokenService.GenerateRandomString(8)
+    code := s.tokenService.GenerateRandomString(8)
 
-	hash, err := bcrypt.GenerateFromPassword(
-		[]byte(code),
-		bcrypt.DefaultCost,
-	)
-	if err != nil {
-		return err
-	}
+    // Save plaintext to return to the user
+    backupCodes = append(backupCodes, code)
 
-	backup := &models.BackupCode{
-		UserID:   userID,
-		CodeHash: string(hash),
-		Used:     false,
-	}
+    hash, err := bcrypt.GenerateFromPassword(
+        []byte(code),
+        bcrypt.DefaultCost,
+    )
+    if err != nil {
+        return nil, err
+    }
 
-	if err := s.backupCodeRepo.Create(backup); err != nil {
-		return err
-	}
+    backup := &models.BackupCode{
+        UserID:   userID,
+        CodeHash: string(hash),
+        Used:     false,
+    }
+
+    if err := s.backupCodeRepo.Create(backup); err != nil {
+        return nil, err
+    }
 }
-
 	// Enable MFA
 	if err := s.userRepo.Update(userID, map[string]interface{}{
 		"mfa_enabled": true,
 	}); err != nil {
-		return errors.New("failed to enable MFA")
+		return nil, errors.New("failed to enable MFA")
 	}
 
 	s.auditService.LogEvent(&userID, "MFA_ENABLED", "USER", userID, "", "", nil)
-	return nil
+	return backupCodes, nil
 }
 
 // DisableMFA re-authenticates the user via password and TOTP code, then disables MFA on their account

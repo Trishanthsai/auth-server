@@ -32,7 +32,17 @@ func (r *BackupCodeRepository) FindByUserID(userID string) ([]models.BackupCode,
 }
 
 func (r *BackupCodeRepository) MarkUsed(id string) error {
-	return r.db.Model(&models.BackupCode{}).
-		Where("id = ?", id).
-		Update("used", true).Error
+	result := r.db.Model(&models.BackupCode{}).
+		Where("id = ? AND used = ?", id, false).
+		Update("used", true)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrBackupCodeNotFound
+	}
+
+	return nil
 }
